@@ -20,10 +20,12 @@ class ATAELSTM(Module):
 
         self.rnn = LSTM(input_size=embed_size,hidden_size=hidden_size,bidirectional=True,batch_first=True,num_layers=1)
         self.rnn = LSTM()
-        self.batch_size = batch_size
-        self.hidden_size = hidden_size
 
-    def forward(self,x):
+
+    def forward(self,input,term):
+        pass
+
+    def param_init(self):
         pass
 
 
