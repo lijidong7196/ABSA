@@ -10,20 +10,27 @@ class Attention(Module):
 
 class ATAELSTM(Module):
 
-    def __init__(self,input_size,embed_size, batch_size, hidden_size,embedding=None):
+    def __init__(self,input_size,embed_size, hidden_size,aspect_size,embedding=None):
         super(ATAELSTM, self).__init__()
         self.embed_size = embed_size
+        self.aspect_size = aspect_size
         if embedding is not None:
             self.embeding = Embedding.from_pretrained(embedding,padding_idx=0)
         else:
             self.embeding = Embedding(input_size,embed_size,padding_idx=0)
 
-        self.rnn = LSTM(input_size=embed_size,hidden_size=hidden_size,bidirectional=True,batch_first=True,num_layers=1)
-        self.rnn = LSTM()
-
+        self.apect_embeding = Embedding(aspect_size,embed_size)
+        self.rnn = LSTM(input_size=embed_size,
+                        hidden_size=hidden_size,
+                        bidirectional=True,
+                        batch_first=True,
+                        num_layers=1)
 
     def forward(self,input,term):
-        pass
+        x = self.embeding(input)
+        aspect = self.apect_embeding(term)
+        torch.cat([x,aspect],dim=-1)
+
 
     def param_init(self):
         pass
