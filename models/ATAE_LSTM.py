@@ -49,7 +49,7 @@ class ATAELSTM(Module):
                         batch_first=True,
                         num_layers=1)
         self.att = Attention(hidden_size,aspect_size)
-
+        self.W_p = Linear()
     def forward(self,input,term):
         x = self.embeding(input)
         aspect = self.apect_embeding(term)
@@ -58,8 +58,4 @@ class ATAELSTM(Module):
 
     def param_init(self):
         pass
-
-
-
-
 
