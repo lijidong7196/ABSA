@@ -5,7 +5,7 @@ from tqdm import tqdm
 import pickle
 import numpy as np
 import os
-
+EMBED_PATH = '../glove.840B.300d/glove.6B.300d.txt'
 def json_parser(data_path):
     with open(data_path, 'r') as f:
         data_dict = json.load(f)
@@ -20,6 +20,37 @@ def json_parser(data_path):
         terms.append(value['term'])
     df = pd.DataFrame({'id':id,'sentence':sentences,'term':terms,'polarity':polarities})
     return df
+
+# load the embedding matrix
+def get_coefs(word,*arr): return word, np.asarray(arr, dtype='float32')
+
+def load_embeddings(embed_dir=EMBED_PATH):
+    embedding_index = dict(get_coefs(*o.strip().split(" ")) for o in tqdm(open(embed_dir)))
+    return embedding_index
+
+def build_embedding_matrix(word_index, embeddings_index, max_features, lower = True, verbose = True):
+    embedding_matrix = np.zeros((max_features, 300))
+    for word, i in tqdm(word_index.items(),disable = not verbose):
+        if lower:
+            word = word.lower()
+        if i >= max_features: continue
+        try:
+            embedding_vector = embeddings_index[word]
+        except:
+            embedding_vector = embeddings_index["unknown"]
+        if embedding_vector is not None:
+            # words not found in embedding index will be all-zeros.
+            embedding_matrix[i] = embedding_vector
+    return embedding_matrix
+
+def build_matrix(word_index, embeddings_index):
+    embedding_matrix = np.zeros((len(word_index) + 1,300))
+    for word, i in word_index.items():
+        try:
+            embedding_matrix[i] = embeddings_index[word]
+        except:
+            embedding_matrix[i] = embeddings_index["unknown"]
+    return embedding_matrix
 
 def build_tokenizer(fnames, max_seq_len, dat_fname):
     if os.path.exists(dat_fname):
@@ -42,35 +73,6 @@ def build_tokenizer(fnames, max_seq_len, dat_fname):
         pickle.dump(tokenizer, open(dat_fname, 'wb'))
     return tokenizer
 
-def _load_word_vec(path, word2idx=None, embed_dim=300):
-    fin = open(path, 'r', encoding='utf-8', newline='\n', errors='ignore')
-    word_vec = {}
-    for line in fin:
-        tokens = line.rstrip().split()
-        word, vec = ' '.join(tokens[:-embed_dim]), tokens[-embed_dim:]
-        if word in word2idx.keys():
-            word_vec[word] = np.asarray(vec, dtype='float32')
-    return word_vec
-
-
-def build_embedding_matrix(word2idx, embed_dim, dat_fname):
-    if os.path.exists(dat_fname):
-        print('loading embedding_matrix:', dat_fname)
-        embedding_matrix = pickle.load(open(dat_fname, 'rb'))
-    else:
-        print('loading word vectors...')
-        embedding_matrix = np.zeros((len(word2idx) + 2, embed_dim))  # idx 0 and len(word2idx)+1 are all-zeros
-        fname = './glove.twitter.27B/glove.twitter.27B.' + str(embed_dim) + 'd.txt' \
-            if embed_dim != 300 else './glove.42B.300d.txt'
-        word_vec = _load_word_vec(fname, word2idx=word2idx, embed_dim=embed_dim)
-        print('building embedding_matrix:', dat_fname)
-        for word, i in word2idx.items():
-            vec = word_vec.get(word)
-            if vec is not None:
-                # words not found in embedding index will be all-zeros.
-                embedding_matrix[i] = vec
-        pickle.dump(embedding_matrix, open(dat_fname, 'wb'))
-    return embedding_matrix
 
 def pad_and_truncate(sequence, maxlen, dtype='int64', padding='post', truncating='post', value=0):
     x = (np.ones(maxlen) * value).astype(dtype)
@@ -123,6 +125,7 @@ class ABSADataset(Dataset):
         lines = file.readlines()
         self.data = []
         self.asp2idx = {}
+        self.tokenizer = tokenizer
         for i in range(0,len(lines),3):
             text_left, _, text_right = [s.lower().strip() for s in lines[i].partition('$T$')]
             aspect = lines[i + 1].lower().strip()
@@ -130,8 +133,8 @@ class ABSADataset(Dataset):
             #build text indices
             # build vocabulary
             full_text = text_left + ' ' + aspect + ' ' + text_right
-            tokenizer.fit_on_text(full_text)
-            text_indices = tokenizer.text_to_sequence(full_text)
+            self.tokenizer.fit_on_text(full_text)
+            text_indices = self.tokenizer.text_to_sequence(full_text)
             polarity = int(polarity) + 1
             data = {'text':text_indices,
                     'aspect':aspect,
@@ -152,8 +155,9 @@ class ABSADataset(Dataset):
 if __name__ == '__main__':
     tokenizer = Tokenizer(30)
     train = ABSADataset('../dataset/data/14lap/Laptops_Train.xml.seg',tokenizer)
-    dataset = DataLoader(train,batch_size=25, shuffle=True)
 
+    embedding_index = load_embeddings()
+    dataset = DataLoader(train,batch_size=25, shuffle=True)
 
 
 
